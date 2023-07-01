@@ -169,3 +169,13 @@ Information on additional methods of contacting the community can be
 found online via the QEMU website:
 
 * `<https://wiki.qemu.org/Contribute/StartHere>`_
+
+
+# Build on macos 13.0.1 Ventura
+
+
+../configure --enable-sdl --disable-cocoa --target-list=arm-softmmu --disable-capstone --disable-pie --disable-slirp --extra-cflags=-I/opt/homebrew/Cellar/openssl@3/3.1.0/include --extra-ldflags='-L/opt/homebrew/Cellar/openssl@3/3.1.0/lib -lcrypto'
+
+# Run on macos 13.0.1 Ventura
+
+qemu-system-arm  -M iPod-Touch,bootrom=bootrom_s5l8900,iboot=iboot_204_n45ap.bin,nand=nand -serial mon:stdio -cpu max -m 1G -d unimp -pflash nor_n45ap.bin -display sdl
