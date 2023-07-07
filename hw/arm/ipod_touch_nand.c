@@ -1,5 +1,6 @@
 #include "hw/arm/ipod_touch_nand.h"
 
+//#define debug_ipod_touch_nand
 static int get_bank(ITNandState *s) {
     uint32_t bank_bitmap = (s->fmctrl0 >> 1) & 0xFF;
     for(int bank = 0; bank < NAND_NUM_BANKS; bank++) {
@@ -31,6 +32,9 @@ void nand_set_buffered_page(ITNandState *s, uint32_t page) {
         uint32_t vpn = page * 8 + bank;
         char filename[200];
         sprintf(filename, "%s/bank%d/%d.page", s->nand_path, bank, page);
+#ifdef debug_ipod_touch_nand
+        printf("nand_set_buffered_page,filename::%s",filename);
+#endif
         struct stat st = {0};
         if (stat(filename, &st) == -1) {
             // page storage does not exist - initialize an empty buffer
@@ -48,7 +52,9 @@ void nand_set_buffered_page(ITNandState *s, uint32_t page) {
 
         s->buffered_page = page;
         s->buffered_bank = bank;
-        // printf("Buffered bank: %d, page: %d\n", s->buffered_bank, s->buffered_page);
+#ifdef debug_ipod_touch_nand
+        printf("Buffered bank: %d, page: %d\n", s->buffered_bank, s->buffered_page);
+#endif
     }
 }
 
@@ -75,7 +81,9 @@ static uint64_t itnand_read(void *opaque, hwaddr addr, unsigned size)
                     // which bank are we at?
                     if(s->fmdnum % 0x800 == 0) {
                         s->cur_bank_reading += 1;
-                        //printf("WILL TURN TO BANK %d (cnt: %d)\n", s->cur_bank_reading, s->fmdnum);
+#ifdef debug_ipod_touch_nand
+                        printf("WILL TURN TO BANK %d (cnt: %d)\n", s->cur_bank_reading, s->fmdnum);
+#endif
                         set_bank(s, s->banks_to_read[s->cur_bank_reading]);
                     }
 
@@ -83,15 +91,21 @@ static uint64_t itnand_read(void *opaque, hwaddr addr, unsigned size)
                     uint32_t page_offset = s->fmdnum % 0x800;
                     if(page_offset == 0) { page_offset = 0x800; }
                     nand_set_buffered_page(s, s->pages_to_read[s->cur_bank_reading]);
-                    //printf("Reading page %d\n", s->pages_to_read[s->cur_bank_reading]);
+#ifdef debug_ipod_touch_nand
+                    printf("Reading page %d\n", s->pages_to_read[s->cur_bank_reading]);
+#endif
                     read_val = ((uint32_t *)s->page_buffer)[(NAND_BYTES_PER_PAGE - page_offset) / 4];
-                    //printf("FMDNUM: %d, offset: %d\n", s->fmdnum, (NAND_BYTES_PER_PAGE - page_offset) / 4);
-                    //printf("Page offset: %d, bytes: 0x%08x\n", page_offset, read_val);
+#ifdef debug_ipod_touch_nand
+                    printf("FMDNUM: %d, offset: %d\n", s->fmdnum, (NAND_BYTES_PER_PAGE - page_offset) / 4);
+                    printf("Page offset: %d, bytes: 0x%08x\n", page_offset, read_val);
+#endif
                 }
                 else {
                     uint32_t page = (s->fmaddr1 << 16) | (s->fmaddr0 >> 16);
                     nand_set_buffered_page(s, page);
-                    //printf("Reading page %d\n", page);
+#ifdef debug_ipod_touch_nand
+                    printf("Reading page %d\n", page);
+#endif
 
                     if(s->reading_spare) {
                         read_val = ((uint32_t *)s->page_spare_buffer)[(NAND_BYTES_PER_SPARE - s->fmdnum - 1) / 4];
@@ -153,8 +167,9 @@ static void itnand_write(void *opaque, hwaddr addr, uint64_t val, unsigned size)
                 // printf("%s: NAND_FMFIFO writing while not in writing mode!\n", __func__);
                 return;
             }
-
-            //printf("Setting offset %d: %d\n", s->fmdnum, (NAND_BYTES_PER_PAGE - s->fmdnum) / 4);
+#ifdef debug_ipod_touch_nand
+            printf("Setting offset %d: %d\n", s->fmdnum, (NAND_BYTES_PER_PAGE - s->fmdnum) / 4);
+#endif
             ((uint32_t *)s->page_buffer)[(NAND_BYTES_PER_PAGE - s->fmdnum) / 4] = val;
             s->fmdnum -= 4;
 
@@ -164,12 +179,17 @@ static void itnand_write(void *opaque, hwaddr addr, uint64_t val, unsigned size)
 
                 // flush the page buffer to the disk
                 uint32_t vpn = s->buffered_page * 8 + s->buffered_bank;
-                //printf("Flushing page %d, bank %d, vpn %d\n", s->buffered_page, s->buffered_bank, vpn);
+#ifdef debug_ipod_touch_nand
+                printf("Flushing page %d, bank %d, vpn %d\n", s->buffered_page, s->buffered_bank, vpn);
+#endif
                 qemu_mutex_lock(&s->lock);
                 qemu_mutex_unlock(&s->lock);
                 {
                     char filename[200];
                     sprintf(filename, "%s/bank%d/%d_new.page", s->nand_path, s->buffered_bank, s->buffered_page);
+#ifdef debug_ipod_touch_nand
+                    printf("itnand_write,filename::%s",filename);
+#endif
                     FILE *f = fopen(filename, "wb");
                     if (f == NULL) { hw_error("Unable to read file!"); }
                     fwrite(s->page_buffer, sizeof(char), NAND_BYTES_PER_PAGE, f);
